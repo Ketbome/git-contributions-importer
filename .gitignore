@@ -1,0 +1,10 @@
+# Environment variables (contains sensitive data)
+.env
+
+# macOS
+.DS_Store
+
+# Temporary files
+*.tmp
+*~
+
