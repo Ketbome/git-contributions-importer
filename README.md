@@ -2,6 +2,36 @@
 
 A bash script that mirrors your work contributions from private repositories to a public GitHub repository, making your professional activity visible on your GitHub profile.
 
+## ⚖️ Important Disclaimer
+
+> **🔒 This tool is 100% ethical and respects confidentiality**
+>
+> This script creates **empty commits with only timestamps** - it does NOT copy, share, or expose any actual code, business logic, or proprietary information from your work repositories.
+>
+> **What it does:**
+>
+> - ✅ Creates timestamped markers showing when you made commits
+> - ✅ Preserves commit dates to reflect your actual activity
+> - ✅ Helps showcase your professional coding consistency
+>
+> **What it does NOT do:**
+>
+> - ❌ Does NOT copy any source code
+> - ❌ Does NOT expose project names or details
+> - ❌ Does NOT share commit messages from original repositories
+> - ❌ Does NOT violate any confidentiality agreements
+>
+> **Legal & Ethical:**
+>
+> - All commits are marked as generic "Activity"
+> - No proprietary information is disclosed
+> - Similar to listing work experience on LinkedIn
+> - Respects employer intellectual property rights
+>
+> **Before using:** Always check your employment contract and company policies regarding public activity tracking.
+
+---
+
 ## 📸 Before & After
 
 <div align="center">
