@@ -1,6 +1,8 @@
 # 📊 Import Contributions to GitHub
 
-A bash script that mirrors your work contributions from private repositories to a public GitHub repository, making your professional activity visible on your GitHub profile.
+A bash script that mirrors your contributions from **any Git repositories** (private, work, personal, from any platform) to a public GitHub repository, making your coding activity visible on your GitHub profile.
+
+**Works with:** GitHub, GitLab, Bitbucket, Azure DevOps, self-hosted Git, or any Git repository.
 
 ## ⚖️ Important Disclaimer
 
@@ -54,18 +56,28 @@ _Full contribution graph showing your actual work activity_
 
 ## 🎯 Purpose
 
-Many developers work on private repositories (company projects, client work, etc.) where their contributions aren't visible on their public GitHub profile. This script solves that problem by creating a mirror repository with timestamped commits that reflect your actual work activity.
+Many developers have contributions scattered across:
+
+- 🏢 Private work repositories (company projects, client work)
+- 🔒 Personal private projects (side projects, experiments)
+- 🌐 Other platforms (GitLab, Bitbucket, Azure DevOps)
+- 💼 Freelance projects (private client repos)
+- 🏠 Self-hosted Git servers
+
+All these contributions are **invisible** on your public GitHub profile. This script solves that problem by creating a mirror repository with timestamped commits that reflect your actual coding activity across all your repositories.
 
 ## ✨ Features
 
-- 🔄 Scans multiple local git repositories
+- 🔄 Works with **any Git repository** (GitHub, GitLab, Bitbucket, Azure DevOps, self-hosted)
+- 📂 Scans multiple local git repositories at once
 - 📅 Preserves original commit dates and times
 - 👤 Uses your personal identity (name and email) for commits
-- 🎯 Optional filtering by work email address
+- 🎯 Optional filtering by email address (work, personal, etc.)
 - 📆 Optional filtering by start date (only recent commits)
-- 📊 Generates statistics and summary
+- 📊 Generates detailed statistics and summary
 - 🚀 Automatically pushes to GitHub
 - ⚡ Handles large commit histories efficiently
+- 🔒 100% safe - no code is copied, only timestamps
 
 ## 🚀 Quick Start
 
