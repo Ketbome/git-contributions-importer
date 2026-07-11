@@ -16,7 +16,9 @@ info() { echo -e "${BLUE}[REPO]${NC} $1"; }
 # Load .env file if exists
 if [ -f ".env" ]; then
     log "Loading configuration from .env file..."
-    export $(grep -v '^#' .env | xargs)
+    set -a
+    source .env
+    set +a
 fi
 
 # Show usage
@@ -28,12 +30,14 @@ show_usage() {
     echo "  2. Pass parameters via command line"
     echo ""
     echo "Command line usage:"
-    echo "  $0 <github-repo> <github-token> <your-name> <your-email> [projects-folder] [filter-email] [since-date]"
+    echo "  $0 [--dry-run] <github-repo> <github-token> <your-name> <your-email> [projects-folder] [filter-email] [since-date] [until-date]"
     echo ""
     echo "Example:"
     echo "  $0 username/work-contributions ghp_xxxxx \"Your Name\" your.personal@gmail.com"
     echo "  $0 username/work-contributions ghp_xxxxx \"Your Name\" your.personal@gmail.com ~/projects"
     echo "  $0 username/work-contributions ghp_xxxxx \"Your Name\" your.personal@gmail.com ~/projects email@work.com 2024-01-01"
+    echo "  $0 username/work-contributions ghp_xxxxx \"Your Name\" your.personal@gmail.com ~/projects email@work.com 2024-01-01 2024-12-31"
+    echo "  $0 --dry-run    # Preview what would be imported (no push, no token needed)"
     echo ""
     echo "Using .env file:"
     echo "  Create a .env file with the following variables:"
@@ -44,11 +48,25 @@ show_usage() {
     echo "    PROJECTS_DIR=~/work-projects              # Optional"
     echo "    FILTER_EMAIL=your.work@company.com        # Optional"
     echo "    SINCE_DATE=2024-01-01                     # Optional (YYYY-MM-DD)"
+    echo "    UNTIL_DATE=2024-12-31                     # Optional (YYYY-MM-DD)"
+    echo "    DRY_RUN=true                              # Optional"
     echo ""
     echo "Then simply run: $0"
     echo ""
     exit 1
 }
+
+# Extract --dry-run flag from arguments (can appear in any position)
+DRY_RUN="${DRY_RUN:-}"
+ARGS=()
+for ARG in "$@"; do
+    if [ "$ARG" = "--dry-run" ]; then
+        DRY_RUN=true
+    else
+        ARGS+=("$ARG")
+    fi
+done
+set -- "${ARGS[@]}"
 
 # Get parameters from command line or environment variables
 if [ $# -gt 0 ]; then
@@ -60,6 +78,7 @@ if [ $# -gt 0 ]; then
     PROJECTS_DIR="${5:-${PROJECTS_DIR:-.}}"
     FILTER_EMAIL="${6:-${FILTER_EMAIL:-}}"
     SINCE_DATE="${7:-${SINCE_DATE:-}}"
+    UNTIL_DATE="${8:-${UNTIL_DATE:-}}"
 else
     # Use environment variables from .env
     GITHUB_REPO="${GITHUB_REPO:-}"
@@ -69,24 +88,33 @@ else
     PROJECTS_DIR="${PROJECTS_DIR:-.}"
     FILTER_EMAIL="${FILTER_EMAIL:-}"
     SINCE_DATE="${SINCE_DATE:-}"
+    UNTIL_DATE="${UNTIL_DATE:-}"
 fi
 
-# Validate required parameters
-if [ -z "$GITHUB_REPO" ] || [ -z "$GITHUB_TOKEN" ] || [ -z "$AUTHOR_NAME" ] || [ -z "$AUTHOR_EMAIL" ]; then
-    show_usage
+# Validate required parameters (not needed in dry-run mode, which only scans)
+if [ "$DRY_RUN" != "true" ]; then
+    if [ -z "$GITHUB_REPO" ] || [ -z "$GITHUB_TOKEN" ] || [ -z "$AUTHOR_NAME" ] || [ -z "$AUTHOR_EMAIL" ]; then
+        show_usage
+    fi
 fi
 
-# Convert to absolute path
+# Expand ~ and convert to absolute path
+PROJECTS_DIR="${PROJECTS_DIR/#\~/$HOME}"
 PROJECTS_DIR="$(cd "$PROJECTS_DIR" && pwd)"
 
 # Verify directory exists
 [ ! -d "$PROJECTS_DIR" ] && error "Directory $PROJECTS_DIR does not exist"
 
 # Validate author parameters
-[ -z "$AUTHOR_NAME" ] && error "Author name cannot be empty"
-[ -z "$AUTHOR_EMAIL" ] && error "Author email cannot be empty"
+if [ "$DRY_RUN" != "true" ]; then
+    [ -z "$AUTHOR_NAME" ] && error "Author name cannot be empty"
+    [ -z "$AUTHOR_EMAIL" ] && error "Author email cannot be empty"
+fi
 
 log "Detected configuration:"
+if [ "$DRY_RUN" = "true" ]; then
+    warn "  🔍 DRY RUN: scanning only, nothing will be created or pushed"
+fi
 log "  Name: $AUTHOR_NAME"
 log "  Email: $AUTHOR_EMAIL"
 log "  Folder: $PROJECTS_DIR"
@@ -96,7 +124,12 @@ fi
 if [ ! -z "$SINCE_DATE" ]; then
     log "  Since Date: Only commits from $SINCE_DATE onwards"
 fi
-warn "⚠️  Make sure $AUTHOR_EMAIL is verified on GitHub!"
+if [ ! -z "$UNTIL_DATE" ]; then
+    log "  Until Date: Only commits up to $UNTIL_DATE"
+fi
+if [ "$DRY_RUN" != "true" ]; then
+    warn "⚠️  Make sure $AUTHOR_EMAIL is verified on GitHub!"
+fi
 echo ""
 
 GITHUB_URL="https://${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git"
@@ -115,50 +148,49 @@ REPOS_FILE="$TEMP_DIR/repos_info.txt"
 touch "$COMMITS_FILE"
 touch "$REPOS_FILE"
 
-# Iterate through all folders
-for DIR in "$PROJECTS_DIR"/*; do
-    if [ -d "$DIR/.git" ]; then
-        REPO_NAME=$(basename "$DIR")
-        REPO_COUNT=$((REPO_COUNT + 1))
-        
-        info "Processing: $REPO_NAME"
-        
-        cd "$DIR"
-        
-        # Get repository information
-        BRANCH_COUNT=$(git branch -a 2>/dev/null | wc -l)
-        
-        # Build git log command with optional filters
-        GIT_LOG_CMD="git log --all"
-        
-        # Add date filter if specified
-        if [ ! -z "$SINCE_DATE" ]; then
-            GIT_LOG_CMD="$GIT_LOG_CMD --since=\"$SINCE_DATE\""
-        fi
-        
-        # Extract commits
-        if [ ! -z "$FILTER_EMAIL" ]; then
-            COMMITS=$(eval "$GIT_LOG_CMD --author=\"$FILTER_EMAIL\" --format=\"%aI|%s|$REPO_NAME\"" 2>/dev/null || echo "")
-            # Check emails in the repo
-            REPO_EMAILS=$(git log --all --format="%ae" 2>/dev/null | sort -u)
-        else
-            COMMITS=$(eval "$GIT_LOG_CMD --format=\"%aI|%s|$REPO_NAME\"" 2>/dev/null || echo "")
-        fi
-        
-        if [ ! -z "$COMMITS" ]; then
-            REPO_COMMITS=$(echo "$COMMITS" | wc -l)
-            TOTAL_COMMITS=$((TOTAL_COMMITS + REPO_COMMITS))
-            echo "$COMMITS" >> "$COMMITS_FILE"
-            echo "$REPO_NAME: $REPO_COMMITS commits" >> "$REPOS_FILE"
-            log "  ✓ $REPO_COMMITS commits found"
-        else
-            warn "  ⚠ No commits found"
-            if [ ! -z "$FILTER_EMAIL" ] && [ ! -z "$REPO_EMAILS" ]; then
-                warn "     Emails in this repo: $(echo "$REPO_EMAILS" | tr '\n' ', ' | sed 's/,$//')"
-            fi
+# Iterate through all repositories (recursive, skips node_modules)
+while IFS= read -r GIT_DIR; do
+    DIR=$(dirname "$GIT_DIR")
+    REPO_NAME=$(basename "$DIR")
+    REPO_COUNT=$((REPO_COUNT + 1))
+
+    info "Processing: $REPO_NAME"
+
+    cd "$DIR"
+
+    # Build git log command with optional filters
+    GIT_LOG_CMD="git log --all"
+
+    # Add date filters if specified
+    if [ ! -z "$SINCE_DATE" ]; then
+        GIT_LOG_CMD="$GIT_LOG_CMD --since=\"$SINCE_DATE\""
+    fi
+    if [ ! -z "$UNTIL_DATE" ]; then
+        GIT_LOG_CMD="$GIT_LOG_CMD --until=\"$UNTIL_DATE\""
+    fi
+
+    # Extract commits
+    if [ ! -z "$FILTER_EMAIL" ]; then
+        COMMITS=$(eval "$GIT_LOG_CMD --author=\"$FILTER_EMAIL\" --format=\"%aI|%s|$REPO_NAME\"" 2>/dev/null || echo "")
+        # Check emails in the repo
+        REPO_EMAILS=$(git log --all --format="%ae" 2>/dev/null | sort -u)
+    else
+        COMMITS=$(eval "$GIT_LOG_CMD --format=\"%aI|%s|$REPO_NAME\"" 2>/dev/null || echo "")
+    fi
+
+    if [ ! -z "$COMMITS" ]; then
+        REPO_COMMITS=$(echo "$COMMITS" | wc -l | tr -d ' ')
+        TOTAL_COMMITS=$((TOTAL_COMMITS + REPO_COMMITS))
+        echo "$COMMITS" >> "$COMMITS_FILE"
+        echo "$REPO_NAME: $REPO_COMMITS commits" >> "$REPOS_FILE"
+        log "  ✓ $REPO_COMMITS commits found"
+    else
+        warn "  ⚠ No commits found"
+        if [ ! -z "$FILTER_EMAIL" ] && [ ! -z "$REPO_EMAILS" ]; then
+            warn "     Emails in this repo: $(echo "$REPO_EMAILS" | tr '\n' ', ' | sed 's/,$//')"
         fi
     fi
-done
+done < <(find "$PROJECTS_DIR" -type d -name .git -not -path "*/node_modules/*" 2>/dev/null | sort)
 
 echo ""
 log "========================================="
@@ -174,6 +206,21 @@ fi
 
 # Sort commits by date
 sort "$COMMITS_FILE" -o "$COMMITS_FILE"
+
+# Dry run: show what would be imported and exit
+if [ "$DRY_RUN" = "true" ]; then
+    log "🔍 Dry run results:"
+    log "  • Date range: $(head -1 "$COMMITS_FILE" | cut -d'|' -f1 | cut -d'T' -f1) → $(tail -1 "$COMMITS_FILE" | cut -d'|' -f1 | cut -d'T' -f1)"
+    log "  • Commits per repository:"
+    while IFS= read -r LINE; do
+        log "      $LINE"
+    done < "$REPOS_FILE"
+    log ""
+    log "Nothing was created or pushed. Run without --dry-run to import."
+    cd /
+    rm -rf "$TEMP_DIR"
+    exit 0
+fi
 
 # Create mirror repository
 log "Creating mirror repository..."

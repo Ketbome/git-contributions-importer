@@ -1,5 +1,10 @@
 # 📊 Import Contributions to GitHub
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Shell Script](https://img.shields.io/badge/Shell-Bash-4EAA25?logo=gnu-bash&logoColor=white)](import-contributions.sh)
+[![GitHub stars](https://img.shields.io/github/stars/Ketbome/git-contributions-importer?style=social)](https://github.com/Ketbome/git-contributions-importer/stargazers)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Ketbome/git-contributions-importer/pulls)
+
 A bash script that mirrors your contributions from **any Git repositories** (private, work, personal, from any platform) to a public GitHub repository, making your coding activity visible on your GitHub profile.
 
 **Works with:** GitHub, GitLab, Bitbucket, Azure DevOps, self-hosted Git, or any Git repository.
@@ -69,11 +74,12 @@ All these contributions are **invisible** on your public GitHub profile. This sc
 ## ✨ Features
 
 - 🔄 Works with **any Git repository** (GitHub, GitLab, Bitbucket, Azure DevOps, self-hosted)
-- 📂 Scans multiple local git repositories at once
+- 📂 Scans multiple local git repositories at once (including subfolders, recursively)
 - 📅 Preserves original commit dates and times
 - 👤 Uses your personal identity (name and email) for commits
 - 🎯 Optional filtering by email address (work, personal, etc.)
-- 📆 Optional filtering by start date (only recent commits)
+- 📆 Optional filtering by date range (`SINCE_DATE` and/or `UNTIL_DATE`)
+- 🔍 Dry-run mode to preview what would be imported before pushing anything
 - 📊 Generates detailed statistics and summary
 - 🚀 Automatically pushes to GitHub
 - ⚡ Handles large commit histories efficiently
@@ -86,7 +92,7 @@ All these contributions are **invisible** on your public GitHub profile. This sc
 1. **Copy the example environment file**:
 
    ```bash
-   cp env.example .env
+   cp .env.example .env
    ```
 
 2. **Edit .env with your information**:
@@ -135,8 +141,9 @@ All these contributions are **invisible** on your public GitHub profile. This sc
 
 - **`import-contributions.sh`** - Main script to import contributions to GitHub
 - **`diagnose-repos.sh`** - Diagnostic tool to analyze your repositories before importing
-- **`env.example`** - Example environment file template
+- **`.env.example`** - Example environment file template
 - **`.gitignore`** - Prevents committing sensitive .env file
+- **`LICENSE`** - MIT license
 - **`README.md`** - This documentation file
 
 ## 📋 Prerequisites
@@ -153,7 +160,7 @@ The easiest way to use both scripts is with a `.env` file. Here's how:
 1. **Copy the example file:**
 
    ```bash
-   cp env.example .env
+   cp .env.example .env
    ```
 
 2. **Edit the .env file:**
@@ -175,6 +182,7 @@ The easiest way to use both scripts is with a `.env` file. Here's how:
    PROJECTS_DIR=~/work-projects
    FILTER_EMAIL=your.work@company.com
    SINCE_DATE=2024-01-01  # Only commits from this date onwards
+   UNTIL_DATE=2024-12-31  # Only commits up to this date
    ```
 
 4. **Run any script:**
@@ -211,7 +219,7 @@ Before importing contributions, it's recommended to run the diagnostic script to
 **Using command line:**
 
 ```bash
-./diagnose-repos.sh [projects-folder] [filter-email] [since-date]
+./diagnose-repos.sh [projects-folder] [filter-email] [since-date] [until-date]
 ```
 
 ### Examples
@@ -239,6 +247,12 @@ Before importing contributions, it's recommended to run the diagnostic script to
 
 ```bash
 ./diagnose-repos.sh ~/work-projects john.work@company.com 2024-01-01
+```
+
+**Check with email and date range:**
+
+```bash
+./diagnose-repos.sh ~/work-projects john.work@company.com 2024-01-01 2024-12-31
 ```
 
 > **Note:** The diagnostic script will also read from your `.env` file if it exists. Command line parameters override the `.env` values.
@@ -295,7 +309,7 @@ This is the easiest way! Just set your configuration once and run the script:
 **Setup:**
 
 ```bash
-cp env.example .env
+cp .env.example .env
 nano .env  # Edit with your values
 ```
 
@@ -335,6 +349,20 @@ If you prefer to pass parameters directly:
 ./import-contributions.sh <github-repo> <github-token> <your-name> <your-email> <projects-folder> <filter-email> <since-date>
 ```
 
+**With Date Range (only commits between two dates):**
+
+```bash
+./import-contributions.sh <github-repo> <github-token> <your-name> <your-email> <projects-folder> <filter-email> <since-date> <until-date>
+```
+
+**Dry Run (preview without creating or pushing anything):**
+
+```bash
+./import-contributions.sh --dry-run
+```
+
+The `--dry-run` flag works with both methods (.env file or command line arguments). It scans your repositories and shows the summary (repos found, commits per repo, date range) without creating the mirror repository or pushing to GitHub. No GitHub token is needed in this mode. You can also set `DRY_RUN=true` in your `.env` file.
+
 > **Note:** Command line arguments will override values from the .env file if both are present.
 
 ### Parameters
@@ -348,6 +376,8 @@ If you prefer to pass parameters directly:
 | `<projects-folder>` | ❌ No    | Path to projects folder (default: current directory)    |
 | `<filter-email>`    | ❌ No    | Filter commits by this email in source repos            |
 | `<since-date>`      | ❌ No    | Only import commits from this date onwards (YYYY-MM-DD) |
+| `<until-date>`      | ❌ No    | Only import commits up to this date (YYYY-MM-DD)        |
+| `--dry-run`         | ❌ No    | Preview the scan without creating or pushing anything   |
 
 ## 💡 Examples
 
@@ -355,7 +385,7 @@ If you prefer to pass parameters directly:
 
 ```bash
 # 1. Setup your .env file once
-cp env.example .env
+cp .env.example .env
 nano .env  # Add your values
 
 # 2. Run the script (as many times as you want)
@@ -397,10 +427,26 @@ cd ~/work-projects
 ./import-contributions.sh  # Will only import commits from 2024 onwards
 ```
 
+### Example 7: Import commits from a specific period (e.g., a previous job)
+
+```bash
+# In your .env file:
+# SINCE_DATE=2023-01-01
+# UNTIL_DATE=2024-06-30
+
+./import-contributions.sh  # Will only import commits between those dates
+```
+
+### Example 8: Preview before importing
+
+```bash
+./import-contributions.sh --dry-run  # Shows what would be imported, no push
+```
+
 ## 📁 How It Works
 
-1. **Scans** all git repositories in the specified folder (or current directory if not specified)
-2. **Extracts** commit history (optionally filtered by email and/or date)
+1. **Scans** all git repositories in the specified folder recursively, including subfolders (or current directory if not specified)
+2. **Extracts** commit history (optionally filtered by email and/or date range)
 3. **Creates** a new temporary git repository
 4. **Generates** mirror commits with original timestamps
 5. **Pushes** everything to your GitHub repository
@@ -413,7 +459,7 @@ cd ~/work-projects
 - 📝 The script only creates empty commits with timestamps - no actual code is copied
 - 🔍 All commits are marked as "Activity" - no sensitive information is exposed
 - 🗑️ Temporary files are automatically cleaned up
-- ✅ Use `env.example` as a template, never commit your actual `.env` file
+- ✅ Use `.env.example` as a template, never commit your actual `.env` file
 
 ## ⚙️ What Gets Created
 
@@ -476,11 +522,12 @@ Example commit message: `🔄 [project-name] Activity`
 
 ## 📆 Why Use Date Filtering?
 
-The `SINCE_DATE` parameter is useful when you:
+The `SINCE_DATE` and `UNTIL_DATE` parameters are useful when you:
 
 - **Want only recent activity**: Import only commits from the last year or specific period
 - **Have a large history**: Avoid importing thousands of old commits
 - **Started a new job**: Only show contributions from your current position
+- **Left a job**: Import only the exact period you worked somewhere
 - **Performance**: Faster execution with fewer commits to process
 
 **Example use cases:**
@@ -494,6 +541,13 @@ SINCE_DATE=2024-06-01
 
 # Only import commits from when you started your current job
 SINCE_DATE=2023-09-15
+
+# Only import commits from a specific period (e.g., a previous job)
+SINCE_DATE=2023-01-01
+UNTIL_DATE=2024-06-30
+
+# Only import commits up to a date (e.g., before you deleted old repos)
+UNTIL_DATE=2023-12-31
 ```
 
 ## 🐛 Troubleshooting
@@ -527,7 +581,7 @@ Make sure the path to your projects folder is correct. You can:
 
 ## 📝 License
 
-MIT License - Feel free to use and modify as needed.
+[MIT License](LICENSE) - Feel free to use and modify as needed.
 
 ## 🤝 Contributing
 
@@ -540,6 +594,10 @@ This tool is designed for legitimate use to showcase your professional work. Alw
 - Have the right to reference your work publicly (check your employment contract)
 - Don't expose any confidential information
 - Use appropriate repository names and descriptions
+
+## 🔎 Related Searches
+
+If you found this tool, you were probably looking for a way to: show private contributions on your GitHub profile, keep your GitHub contribution graph green, import commits from GitLab or Bitbucket to GitHub, sync work commits to your personal profile, or make your GitHub activity reflect your real coding activity. This script covers all of those use cases.
 
 ---
 
